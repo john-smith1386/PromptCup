@@ -1,0 +1,1180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prompt Cup</title>
+<style>
+  :root{
+    --pitch-a:#2e7d3a; --pitch-b:#27702f;
+    --chalk:#f2f0e4;
+    --board:#10243a; --board-edge:#0a1827;
+    --amber:#ffb52e; --signal-red:#e6483d; --win:#39c46a;
+    --ink:#0e1a12;
+  }
+  *{box-sizing:border-box;margin:0}
+  html,body{height:100%}
+  body{
+    background:repeating-linear-gradient(0deg, var(--pitch-a) 0 64px, var(--pitch-b) 64px 128px);
+    font-family:"SF Mono", ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace;
+    color:var(--chalk); display:flex;flex-direction:column;align-items:center; overflow:hidden;
+  }
+
+  #board{
+    width:min(720px,100vw);
+    background:linear-gradient(var(--board), var(--board-edge));
+    border-bottom:3px solid var(--amber);
+    display:flex;align-items:center;gap:12px;
+    padding:8px 14px; font-size:14px;letter-spacing:.08em; user-select:none;
+  }
+  .digits{color:var(--amber);font-weight:700;font-variant-numeric:tabular-nums}
+  .sep{opacity:.35}
+  #flagBtn{background:none;border:1px solid rgba(242,240,228,.25);border-radius:3px;
+    color:var(--chalk);font-size:16px;padding:2px 7px;cursor:pointer;font-family:inherit}
+  #helpBtn{background:none;border:1px solid rgba(242,240,228,.25);border-radius:50%;
+    color:var(--amber);font-size:13px;font-weight:700;width:24px;height:24px;
+    cursor:pointer;font-family:inherit;line-height:1}
+  #helpBtn:hover{border-color:var(--amber)}
+  #trophyBtn{background:rgba(255,181,46,.14);border:1px solid rgba(255,181,46,.5);
+    border-radius:3px;color:var(--amber);font-size:13px;font-weight:700;
+    padding:2px 8px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:3px}
+  #trophyBtn:hover{background:rgba(255,181,46,.26)}
+  #stageTag{font-size:11px;opacity:.7}
+  #friendlyTag{display:none;font-size:11px;color:var(--ink);background:var(--amber);
+    padding:2px 6px;border-radius:3px;font-weight:700}
+  body.practice #friendlyTag{display:inline}
+  #agentLamp{margin-left:auto;display:flex;align-items:center;gap:7px;font-size:12px}
+  #lampDot{width:9px;height:9px;border-radius:50%;background:#5a6c7d}
+  .lamp-working #lampDot{background:var(--signal-red);animation:blink 1s steps(2) infinite}
+  .lamp-input  #lampDot{background:var(--amber)}
+  .lamp-done   #lampDot{background:var(--win)}
+  @keyframes blink{50%{opacity:.25}}
+
+  /* shootout pips: the classic broadcast graphic */
+  #pips{
+    width:min(720px,100vw); background:var(--board-edge);
+    display:flex;justify-content:center;gap:26px;
+    padding:5px 14px;font-size:14px;letter-spacing:.2em;
+    border-bottom:1px solid rgba(255,181,46,.25);
+  }
+  #pips .you b{color:var(--win)} #pips .opp b{color:var(--signal-red)}
+  #pips .turn{outline:1px solid var(--amber);outline-offset:3px;border-radius:2px}
+
+  #stage{position:relative;width:min(720px,100vw)}
+  canvas{display:block;width:100%;height:auto}
+
+  #ticker{
+    width:min(720px,100vw); background:var(--board-edge); color:var(--chalk);
+    font-size:12px;letter-spacing:.06em; padding:7px 14px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    border-top:1px solid rgba(255,181,46,.35); min-height:30px;
+  }
+  #ticker b{color:var(--amber)}
+
+  .overlay{
+    position:absolute;inset:0;display:none;flex-direction:column;
+    align-items:center;justify-content:center;text-align:center;gap:13px;
+    background:rgba(10,24,39,.9); padding:20px;
+  }
+  .overlay.show{display:flex}
+  .overlay h1{font-size:clamp(30px,8vw,56px);letter-spacing:.14em;color:var(--amber);
+    text-shadow:0 3px 0 var(--board-edge)}
+  .overlay p{font-size:14px;max-width:50ch;line-height:1.65;opacity:.92}
+  .overlay .small{font-size:12px;opacity:.6}
+  .overlay .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  .overlay button{
+    font-family:inherit;font-size:14px;letter-spacing:.08em;
+    background:var(--amber);color:var(--ink);border:none;border-radius:3px;
+    padding:10px 22px;cursor:pointer;font-weight:700;
+  }
+  .overlay button.ghost{background:transparent;color:var(--chalk);
+    border:1px solid rgba(242,240,228,.4)}
+  #ftOverlay h1{color:var(--win)}
+  #lockedOverlay h1{color:var(--signal-red)}
+
+  #foot{
+    width:min(720px,100vw);display:flex;gap:8px;align-items:center;
+    padding:8px 14px;font-size:11px;opacity:.85;flex-wrap:wrap;
+  }
+  #foot button{
+    font-family:inherit;font-size:11px;background:rgba(16,36,58,.8);
+    color:var(--chalk);border:1px solid rgba(242,240,228,.25);
+    border-radius:3px;padding:4px 9px;cursor:pointer;
+  }
+  #foot button:hover{border-color:var(--amber)}
+
+  /* ---------- persistent links bar ---------- */
+  #linksBar{
+    width:min(720px,100vw);
+    background:var(--board-edge);
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    padding:7px 14px;font-size:11.5px;
+    border-top:1px solid rgba(255,181,46,.18);
+  }
+  #linksBar .lbl{opacity:.55;letter-spacing:.04em}
+  #linksBar a{
+    display:inline-flex;align-items:center;gap:6px;
+    color:var(--chalk);text-decoration:none;
+    background:rgba(16,36,58,.7);border:1px solid rgba(242,240,228,.18);
+    border-radius:14px;padding:3px 11px 3px 4px;
+  }
+  #linksBar a:hover{border-color:var(--amber);color:#fff}
+  #linksBar a img{width:20px;height:20px;border-radius:50%;background:#fff;object-fit:cover}
+  #linksBar a.support{
+    padding:4px 12px;background:rgba(57,196,106,.14);border-color:rgba(57,196,106,.5);
+    color:#9fe7b8;margin-left:auto;
+  }
+  #linksBar a.support:hover{background:rgba(57,196,106,.26);color:#fff}
+  #devTools{display:none;gap:6px;align-items:center}
+  body.dev #devTools{display:flex}
+  .label{opacity:.6}
+  @media (prefers-reduced-motion: reduce){ .lamp-working #lampDot{animation:none} }
+
+  /* ---------- help modal ---------- */
+  #helpModal{
+    position:fixed;inset:0;z-index:50;display:none;
+    background:rgba(8,18,30,.82);
+    overflow-y:auto;padding:30px 16px;
+  }
+  #helpModal.show{display:block}
+  #helpModal .sheet{
+    max-width:560px;margin:0 auto;position:relative;
+    background:#13283f;border:1px solid rgba(255,181,46,.3);border-radius:10px;
+    padding:26px 26px 32px;line-height:1.6;
+  }
+  #helpModal h2{font-size:22px;color:var(--amber);letter-spacing:.04em;margin-bottom:6px}
+  #helpModal h3{font-size:15px;color:var(--amber);margin:22px 0 6px;letter-spacing:.03em}
+  #helpModal .lead{opacity:.9;margin-bottom:6px}
+  #helpModal p{font-size:13.5px;opacity:.92}
+  #helpModal ul{font-size:13.5px;opacity:.92;margin:6px 0 4px 18px}
+  #helpModal li{margin:2px 0}
+  #helpModal b{color:#fff}
+  #helpModal img{width:100%;border-radius:6px;margin-top:10px;border:1px solid rgba(242,240,228,.15)}
+  #helpClose{
+    position:absolute;top:12px;right:12px;width:30px;height:30px;border-radius:50%;
+    background:rgba(10,24,39,.9);color:var(--chalk);border:1px solid rgba(242,240,228,.3);
+    font-size:14px;cursor:pointer;font-family:inherit
+  }
+  #helpClose:hover{border-color:var(--amber)}
+  #helpModal .links{margin-top:8px}
+  #helpModal .links a{display:block;color:var(--chalk);text-decoration:none}
+  #helpModal a.proj{
+    display:flex;align-items:center;gap:12px;
+    background:rgba(10,24,39,.55);border:1px solid rgba(242,240,228,.15);
+    border-radius:8px;padding:10px;margin:8px 0;font-size:13px;
+  }
+  #helpModal a.proj:hover{border-color:var(--amber)}
+  #helpModal a.proj img{width:44px;height:44px;margin:0;border-radius:8px;flex:0 0 auto}
+  #helpModal a.proj span{font-size:12.5px;opacity:.9;line-height:1.45}
+  #helpModal a.proj b{color:var(--amber)}
+  #cabinet{background:rgba(255,181,46,.07);border:1px solid rgba(255,181,46,.3);
+    border-radius:8px;padding:14px 16px;margin:14px 0 4px}
+  #cabinet #cabinetSummary{color:var(--amber);font-size:13px;margin-bottom:8px}
+  #cabinet .cup{display:flex;align-items:center;gap:10px;font-size:13px;
+    padding:6px 0;border-top:1px solid rgba(242,240,228,.12)}
+  #cabinet .cup:first-of-type{border-top:none}
+  #cabinet .cup .n{color:var(--amber);font-weight:700;width:28px}
+  #cabinet .cup .fl{font-size:18px}
+  #cabinet .cup .meta{opacity:.7;margin-left:auto;font-size:11.5px}
+</style>
+</head>
+<body>
+
+<div id="board" role="status">
+  <button id="flagBtn" title="Change country">🏴</button>
+  <button id="helpBtn" title="How to play">?</button>
+  <button id="trophyBtn" title="Trophy cabinet" style="display:none">🏆<span id="trophyCount">0</span></button>
+  <span class="digits" id="matchScore">0 - 0</span>
+  <span id="oppFlag">·</span>
+  <span class="sep">|</span>
+  <span id="stageTag">GROUP</span>
+  <span id="friendlyTag">FRIENDLY</span>
+  <span id="agentLamp" class="lamp-idle"><span id="lampDot"></span><span id="lampText">PITCH CLOSED</span></span>
+</div>
+
+<div id="pips"><span class="you"></span><span class="opp"></span></div>
+
+<div id="stage">
+  <canvas id="pitch" width="720" height="430" aria-label="Penalty shootout."></canvas>
+
+  <div class="overlay show" id="lockedOverlay">
+    <h1>PITCH CLOSED</h1>
+    <p id="lockedLine">Goals are only scored while your agent works. Submit a prompt in your coding agent and the referee opens the match.</p>
+    <p class="small" id="careerLine"></p>
+    <div class="row"><button class="ghost" id="practiceBtn">Play a friendly (counts for nothing)</button></div>
+  </div>
+
+  <div class="overlay" id="ftOverlay">
+    <h1>FULL TIME</h1>
+    <p id="ftLine">Your agent finished. Back to the review.</p>
+    <p class="small" id="ftScore"></p>
+    <button id="ftBtn">Back to work</button>
+  </div>
+
+  <div class="overlay" id="refOverlay">
+    <h1>REF PAUSE</h1>
+    <p id="refLine">Your agent needs input. The match waits for you, not the other way round.</p>
+    <button id="refBtn">Got it</button>
+  </div>
+
+  <div class="overlay" id="cupOverlay">
+    <h1 id="cupTitle">MATCH WON</h1>
+    <p id="cupLine"></p>
+    <p class="small" id="cupSub"></p>
+    <button id="cupBtn">Continue</button>
+  </div>
+</div>
+
+<div id="ticker">⚽ Pitch closed. Waiting on your agent.</div>
+
+<div id="helpModal" role="dialog" aria-modal="true" aria-label="How to play">
+  <div class="sheet">
+    <button id="helpClose" aria-label="Close">✕</button>
+    <h2>⚽ How to play Prompt Cup</h2>
+    <p class="lead">A penalty shootout for the dead time while your coding agent works. You can only score while the agent is actually working, and the game stops the instant it finishes.</p>
+
+    <div id="cabinet" style="display:none">
+      <h3>🏆 Trophy cabinet</h3>
+      <p id="cabinetSummary"></p>
+      <div id="cabinetList"></div>
+    </div>
+
+    <h3>1. The pitch is closed until your agent works</h3>
+    <p>No live agent, no goals. Submit a prompt in your coding agent (Claude Code, Codex, or Gemini) and the referee opens the match. Want to warm up with nothing on the line? Hit <b>Play a friendly</b>.</p>
+    <img src="/screens/05-pitch-closed.png" alt="Pitch closed screen">
+
+    <h3>2. Kickoff</h3>
+    <p>The moment you send a prompt, the lamp turns red (<b>AGENT LIVE</b>) and your match begins. The scoreline and the dots up top (the pips) track a best-of-five shootout against an AI nation.</p>
+    <img src="/screens/02-kickoff.png" alt="Kickoff, agent live">
+
+    <h3>3. Your kick: beat the keeper</h3>
+    <p>Move the mouse (or arrow keys) to aim. Your aim <b>sways</b>, that's nerves, so time it. Click once to start the power bar, click again to shoot:</p>
+    <ul>
+      <li><b>Under 50%</b> tame, the keeper holds it</li>
+      <li><b>50 to 72%</b> placed</li>
+      <li><b>72 to 90%</b> the sweet spot, hardest to save</li>
+      <li><b>Over 90%</b> a blast that drifts toward the post</li>
+    </ul>
+    <img src="/screens/01-your-kick.png" alt="Your kick">
+
+    <h3>4. Your save: you go in goal</h3>
+    <p>Roles flip every round. The goal splits into three zones and <b>you are the goalkeeper</b>. The shooter commits before you choose, he can't see your dive, so read him: he leans toward his side (the best teams fake it), and from his third kick the ticker shows where he's gone all match. Dive with <b>← ↑ →</b> or click a zone.</p>
+    <img src="/screens/03-in-goal.png" alt="You are in goal, pick your dive">
+
+    <h3>5. The whistle, and the stall warning</h3>
+    <p>When the agent finishes, full time, the pitch freezes and you're back to your review. And if the agent goes silent for 45 seconds (often a permission prompt you didn't notice), the game stops and tells you to <b>check your agent</b>, so it never fakes progress.</p>
+    <img src="/screens/04-ref-pause.png" alt="Check agent warning">
+
+    <h3>The cup</h3>
+    <p>Win to climb GROUP → R16 → QF → SF → FINAL. Lose and you replay the stage. Matches <b>suspend at the whistle and resume on your next prompt</b>, being 3 to 2 up in a semi is what pulls you back next time you code.</p>
+
+    <div class="links">
+      <h3>More from the maker</h3>
+      <a class="proj" href="https://joberney.com" target="_blank" rel="noopener">
+        <img src="/screens/joberney.jpg" alt="Joberney"><span><b>Joberney</b><br>Career & entrepreneurship platform · joberney.com</span>
+      </a>
+      <a class="proj" href="https://kindnesssender.com" target="_blank" rel="noopener">
+        <img src="/screens/kindnesssender.png" alt="KindnessSender"><span><b>KindnessSender</b><br>Send a little kindness · kindnesssender.com</span>
+      </a>
+      <a class="proj" href="https://beadela.com" target="_blank" rel="noopener">
+        <img src="/screens/beadela.webp" alt="Beadela"><span><b>Beadela</b><br>Fuse-bead pattern app · beadela.com</span>
+      </a>
+      <h3>Support & plant trees</h3>
+      <a href="https://plantyourtip.com/g2FfQQIl5d" target="_blank" rel="noopener">
+        <img src="https://cdn.plantyourtip.com/assets/PlantYourTipS1.png" alt="PlantYourTip" style="width:120px;height:auto">
+      </a>
+    </div>
+  </div>
+</div>
+
+<div id="linksBar">
+  <span class="lbl">More from the maker:</span>
+  <a href="https://joberney.com" target="_blank" rel="noopener" title="Joberney — career & entrepreneurship platform">
+    <img src="/screens/joberney.jpg" alt="">Joberney
+  </a>
+  <a href="https://kindnesssender.com" target="_blank" rel="noopener" title="KindnessSender">
+    <img src="/screens/kindnesssender.png" alt="">KindnessSender
+  </a>
+  <a href="https://beadela.com" target="_blank" rel="noopener" title="Beadela — fuse-bead pattern app">
+    <img src="/screens/beadela.webp" alt="">Beadela
+  </a>
+  <a class="support" href="https://plantyourtip.com/g2FfQQIl5d" target="_blank" rel="noopener" title="Support & plant trees">
+    🌱 Support &amp; plant trees
+  </a>
+</div>
+
+<div id="foot">
+  <button id="endPracticeBtn" style="display:none">End friendly</button>
+  <span id="devTools">
+    <span class="label">dev:</span>
+    <button data-demo="UserPromptSubmit">kickoff</button>
+    <button data-demo="PostToolUse">tool</button>
+    <button data-demo="Notification">input</button>
+    <button data-demo="Stop">whistle</button>
+  </span>
+  <span style="margin-left:auto">v1.0.0 · sound <button id="muteBtn">on</button></span>
+</div>
+
+<script>
+"use strict";
+/* =====================================================================
+   Prompt Cup — broadcast-legible shootout
+   Every kick is a sequence you can follow:
+     ANNOUNCE who shoots (flag + kit) -> AIM -> POWER -> RUN-UP ->
+     BALL FLIGHT with keeper dive -> RESULT held on screen -> pips update
+   Opponent kicks are interactive: YOU are the keeper, pick your dive.
+   ===================================================================== */
+
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+if (location.search.includes("dev")) document.body.classList.add("dev");
+const $ = (id) => document.getElementById(id);
+const now = () => performance.now();
+const TAU = Math.PI * 2;
+const T = (ms) => (REDUCED ? Math.min(ms, 350) : ms);   // global pacing
+
+/* ---------------- nations & kits ---------------- */
+const NATIONS = [
+  ["🇩🇪","Germany"],["🇧🇷","Brazil"],["🇦🇷","Argentina"],["🇫🇷","France"],
+  ["🇪🇸","Spain"],["🇮🇹","Italy"],["🇵🇹","Portugal"],["🇳🇱","Netherlands"],
+  ["🇲🇽","Mexico"],["🇯🇵","Japan"],["🇲🇦","Morocco"],["🇭🇷","Croatia"],
+  ["🇺🇾","Uruguay"],["🇧🇪","Belgium"],["🇰🇷","South Korea"],["🇨🇴","Colombia"],
+];
+const KITS = {
+  "🇩🇪":["#f5f5f5","#1a1a1a"],"🇧🇷":["#ffdc1a","#1a9850"],"🇦🇷":["#9ecfff","#f5f5f5"],
+  "🇫🇷":["#2545c9","#f5f5f5"],"🇪🇸":["#d62828","#ffd700"],"🇮🇹":["#2068c0","#f5f5f5"],
+  "🇵🇹":["#a01818","#0a6b3d"],"🇳🇱":["#ff7a00","#f5f5f5"],"🇲🇽":["#1a7a3c","#f5f5f5"],
+  "🇯🇵":["#2545c9","#f5f5f5"],"🇲🇦":["#c1272d","#1a7a3c"],"🇭🇷":["#f5f5f5","#d62828"],
+  "🇺🇾":["#7ab8e6","#1a1a1a"],"🇧🇪":["#d62828","#1a1a1a"],"🇰🇷":["#d62828","#2545c9"],
+  "🇨🇴":["#ffdc1a","#2545c9"],"🇺🇸":["#f5f5f5","#2545c9"],"🇨🇦":["#d62828","#f5f5f5"],
+  "🇬🇧":["#f5f5f5","#2545c9"],"🇦🇺":["#ffdc1a","#1a7a3c"],"🇮🇳":["#3aa0e0","#ff9933"],
+  "🇹🇷":["#d62828","#f5f5f5"],"🇮🇩":["#d62828","#f5f5f5"],"🇳🇬":["#1a9850","#f5f5f5"],
+};
+const kit = (flag) => KITS[flag] || ["#1f3f5b","#ffb52e"];
+
+const STAGES = [
+  { name: "GROUP STAGE", diff: 0.00 },
+  { name: "ROUND OF 16", diff: 0.06 },
+  { name: "QUARTER FINAL", diff: 0.12 },
+  { name: "SEMI FINAL", diff: 0.18 },
+  { name: "THE FINAL", diff: 0.26 },
+];
+const TITLES = [[0,"Sunday League"],[8,"Semi-Pro"],[20,"Professional"],[45,"International"],[90,"World Class"],[160,"Legend"]];
+
+function newOpponent(stageIdx, stars) {
+  const [flag, name] = NATIONS[(Math.random() * NATIONS.length) | 0];
+  return { flag, name, rating: 0.5 + STAGES[stageIdx].diff + stars * 0.04 };
+}
+/* youKicks/oppKicks: arrays of true(goal)/false(miss) for the pips graphic */
+function newMatch(stageIdx, stars) {
+  return { stageIdx, opp: newOpponent(stageIdx, stars),
+           youKicks: [], oppKicks: [], oppColHist: [], sudden: false };
+}
+const mYou = () => S.match.youKicks.filter(Boolean).length;
+const mThem = () => S.match.oppKicks.filter(Boolean).length;
+
+/* ---------------- persistence ---------------- */
+const saved = JSON.parse(localStorage.getItem("promptcup3") || "{}");
+const S = {
+  goals: saved.goals | 0, kicks: saved.kicks | 0,
+  streak: saved.streak | 0, best: saved.best | 0,
+  stars: saved.stars | 0,
+  trophies: Array.isArray(saved.trophies) ? saved.trophies : [],
+  flag: saved.flag || "🇺🇸",
+  muted: !!saved.muted,
+  seenHelp: !!saved.seenHelp,
+  match: saved.match || newMatch(0, saved.stars | 0),
+};
+/* migrate saves from older versions: missing fields must never crash a kick */
+if (!S.match || !S.match.opp || !Array.isArray(S.match.youKicks)) S.match = newMatch(0, S.stars);
+S.match.oppColHist = Array.isArray(S.match.oppColHist) ? S.match.oppColHist : [];
+S.match.oppKicks = Array.isArray(S.match.oppKicks) ? S.match.oppKicks : [];
+function persist() {
+  localStorage.setItem("promptcup3", JSON.stringify(S));
+  fetch("/score", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ goals: S.goals, kicks: S.kicks, streak: S.streak, flag: S.flag }) }).catch(() => {});
+}
+function title() { let t = TITLES[0][1]; for (const [g, n] of TITLES) if (S.goals >= g) t = n; return t; }
+
+/* ---------------- session gate ---------------- */
+let session = "locked";                 // locked | live | practice
+let practiceScore = { goals: 0, kicks: 0 };
+
+/* ---------------- scoreboard + pips ---------------- */
+function pipStr(arr, total) {
+  let s = "";
+  for (let i = 0; i < total; i++) s += i < arr.length ? (arr[i] ? "●" : "✕") : "○";
+  return s;
+}
+function renderBoard() {
+  const m = S.match;
+  if (session === "practice") {
+    $("matchScore").textContent = `${practiceScore.goals}⚽ / ${practiceScore.kicks}`;
+    $("oppFlag").textContent = "·"; $("stageTag").textContent = "";
+    $("pips").style.visibility = "hidden";
+  } else {
+    $("matchScore").textContent = `${mYou()} - ${mThem()}`;
+    $("oppFlag").textContent = m.opp.flag;
+    $("stageTag").textContent = STAGES[m.stageIdx].name + (S.stars ? " " + "★".repeat(Math.min(S.stars, 5)) : "") + (m.sudden ? " · SUDDEN DEATH" : "");
+    $("pips").style.visibility = "visible";
+    const total = m.sudden ? Math.max(m.youKicks.length, m.oppKicks.length) + 1 : 5;
+    const yourTurn = m.youKicks.length === m.oppKicks.length;  // you always kick first
+    document.querySelector("#pips .you").innerHTML =
+      `${S.flag} <b>${pipStr(m.youKicks, total)}</b>`;
+    document.querySelector("#pips .opp").innerHTML =
+      `<b>${pipStr(m.oppKicks, total)}</b> ${m.opp.flag}`;
+    document.querySelector("#pips .you").classList.toggle("turn", yourTurn);
+    document.querySelector("#pips .opp").classList.toggle("turn", !yourTurn);
+  }
+  $("flagBtn").textContent = S.flag;
+  $("muteBtn").textContent = S.muted ? "off" : "on";
+  document.body.classList.toggle("practice", session === "practice");
+}
+const FLAGS = NATIONS.map((n) => n[0]).concat(["🇺🇸","🇨🇦","🇬🇧","🇦🇺","🇮🇳","🇹🇷","🇮🇩","🇳🇬"]);
+$("flagBtn").addEventListener("click", () => { S.flag = FLAGS[(FLAGS.indexOf(S.flag) + 1) % FLAGS.length]; persist(); renderBoard(); });
+$("muteBtn").addEventListener("click", () => { S.muted = !S.muted; persist(); renderBoard(); });
+
+/* ---------------- help modal ---------------- */
+function renderTrophies() {
+  const n = S.trophies.length;
+  $("trophyBtn").style.display = n ? "flex" : "none";
+  $("trophyCount").textContent = n;
+  $("cabinet").style.display = n ? "block" : "none";
+  if (!n) return;
+  const byNation = {};
+  for (const t of S.trophies) byNation[t.flag] = (byNation[t.flag] || 0) + 1;
+  const spread = Object.entries(byNation).map(([f, c]) => `${f}×${c}`).join("  ");
+  $("cabinetSummary").textContent = `${n} ${n === 1 ? "cup" : "cups"} won  ·  ${spread}`;
+  $("cabinetList").innerHTML = S.trophies.map((t, i) => {
+    const d = new Date(t.date);
+    const when = isNaN(d) ? "" : d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    return `<div class="cup"><span class="n">#${i + 1}</span><span class="fl">${t.flag}</span>` +
+           `<span>Prompt Cup champion</span><span class="meta">${when}</span></div>`;
+  }).reverse().join("");
+}
+function openHelp() { renderTrophies(); $("helpModal").classList.add("show"); }
+function closeHelp() { $("helpModal").classList.remove("show"); }
+$("helpBtn").addEventListener("click", openHelp);
+$("trophyBtn").addEventListener("click", openHelp);
+$("helpClose").addEventListener("click", closeHelp);
+$("helpModal").addEventListener("click", (e) => { if (e.target.id === "helpModal") closeHelp(); });
+addEventListener("keydown", (e) => { if (e.key === "Escape") closeHelp(); });
+if (!saved.seenHelp) { openHelp(); S.seenHelp = true; persist(); }
+
+/* ---------------- audio ---------------- */
+let actx = null;
+function tone(freq, dur, type = "square", gain = 0.06, when = 0) {
+  if (S.muted) return;
+  actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.setValueAtTime(gain, actx.currentTime + when);
+  g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + when + dur);
+  o.connect(g).connect(actx.destination);
+  o.start(actx.currentTime + when); o.stop(actx.currentTime + when + dur + 0.02);
+}
+function noiseBurst(dur = 0.5, gain = 0.05) {
+  if (S.muted) return;
+  actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+  const len = actx.sampleRate * dur, buf = actx.createBuffer(1, len, actx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+  const src = actx.createBufferSource(), g = actx.createGain(), f = actx.createBiquadFilter();
+  f.type = "bandpass"; f.frequency.value = 900;
+  g.gain.value = gain; src.buffer = buf;
+  src.connect(f).connect(g).connect(actx.destination); src.start();
+}
+const sfx = {
+  kick: () => tone(180, 0.08, "triangle", 0.1),
+  goal: () => { tone(660, 0.1); tone(880, 0.12, "square", 0.06, 0.1); noiseBurst(0.7, 0.06); },
+  save: () => tone(140, 0.18, "sawtooth", 0.07),
+  post: () => { tone(1100, 0.05, "square", 0.1); tone(740, 0.25, "triangle", 0.06, 0.04); },
+  oppGoal: () => tone(110, 0.3, "sawtooth", 0.05),
+  whistle: () => { tone(2200, 0.35, "square", 0.05); tone(2640, 0.3, "square", 0.04, 0.05); tone(2200, 0.5, "square", 0.05, 0.45); },
+  card: () => tone(330, 0.12, "sawtooth", 0.05),
+  announce: () => tone(520, 0.1, "square", 0.04),
+  trophy: () => { [523,659,784,1046].forEach((f,i)=>tone(f,0.22,"square",0.06,i*0.13)); noiseBurst(1.2,0.07); },
+};
+
+/* ---------------- canvas + geometry ---------------- */
+const cv = $("pitch"), cx = cv.getContext("2d");
+const W = cv.width, H = cv.height;
+const GOAL = { x: 160, y: 70, w: 400, h: 150 };
+const SPOT = { x: W / 2, y: H - 80 };
+
+/* ---------------- state machine ----------------
+   locked
+   yourAnnounce -> aiming -> power -> runup -> flight -> result
+   oppAnnounce  -> oppDive (you pick a side) -> oppFlight -> oppResult     */
+let mode = "locked";
+let frozen = true;
+let mouseAim = { x: W / 2, y: GOAL.y + GOAL.h / 2 };
+let aim = { ...mouseAim };
+let swayT = Math.random() * 100;
+let power = 0, powerDir = 1;
+let shot = null;        // your shot in motion {t,from,to,outcome,keeper:{col,row}}
+let oppShot = null;     // their shot {t,target:{col,row,x,y},dive,outcome}
+let runner = null;      // run-up animation {t,dur}
+let banner = null;      // big center text {text,color,sub,until}
+let hint = "";          // instruction line drawn under the spot
+let announceUntil = 0;
+const habit = [0, 0, 0];
+const timers = new Set();
+function later(fn, ms) { const id = setTimeout(() => { timers.delete(id); fn(); }, T(ms)); timers.add(id); }
+function clearTimers() { for (const id of timers) clearTimeout(id); timers.clear(); }
+
+/* ---------------- difficulty ---------------- */
+function pressure() {
+  const m = S.match;
+  if (session === "practice") return 0;
+  const clutch = m.youKicks.length >= 3 || m.sudden ? 0.06 : 0;
+  return STAGES[m.stageIdx].diff + S.stars * 0.03 + Math.min(0.1, S.streak * 0.015) + clutch;
+}
+const swayAmp = () => (REDUCED ? 10 : 16) + pressure() * 90;
+const powerSpeed = () => 0.030 + pressure() * 0.05;
+
+/* ---------------- input ---------------- */
+function canvasPos(e) {
+  const r = cv.getBoundingClientRect();
+  return { x: ((e.clientX - r.left) / r.width) * W, y: ((e.clientY - r.top) / r.height) * H };
+}
+cv.addEventListener("mousemove", (e) => {
+  if (frozen || (mode !== "aiming" && mode !== "power")) return;
+  const p = canvasPos(e);
+  mouseAim.x = Math.max(GOAL.x - 30, Math.min(GOAL.x + GOAL.w + 30, p.x));
+  mouseAim.y = Math.max(GOAL.y - 20, Math.min(GOAL.y + GOAL.h, p.y));
+});
+cv.addEventListener("mousedown", (e) => {
+  if (frozen) return;
+  if (mode === "oppDive") {
+    const p = canvasPos(e);
+    const col = p.x < GOAL.x + GOAL.w / 3 ? 0 : p.x < GOAL.x + 2 * GOAL.w / 3 ? 1 : 2;
+    resolveDive(col);
+    return;
+  }
+  advance();
+});
+addEventListener("keydown", (e) => {
+  if (frozen) return;
+  if (mode === "oppDive") {
+    if (e.key === "ArrowLeft") return resolveDive(0);
+    if (e.key === "ArrowUp" || e.key === " ") { e.preventDefault(); return resolveDive(1); }
+    if (e.key === "ArrowRight") return resolveDive(2);
+    return;
+  }
+  const sx = GOAL.w / 6, sy = GOAL.h / 4;
+  if (mode === "aiming" || mode === "power") {
+    if (e.key === "ArrowLeft") mouseAim.x -= sx;
+    if (e.key === "ArrowRight") mouseAim.x += sx;
+    if (e.key === "ArrowUp") mouseAim.y -= sy;
+    if (e.key === "ArrowDown") mouseAim.y += sy;
+    mouseAim.x = Math.max(GOAL.x - 30, Math.min(GOAL.x + GOAL.w + 30, mouseAim.x));
+    mouseAim.y = Math.max(GOAL.y - 20, Math.min(GOAL.y + GOAL.h, mouseAim.y));
+  }
+  if (e.key === " " || e.key === "Enter") { e.preventDefault(); advance(); }
+});
+function advance() {
+  if (mode === "aiming") { mode = "power"; power = 0; powerDir = 1; hint = "click again to SHOOT (aim for the green sweet spot)"; return; }
+  if (mode === "power") beginRunup();
+}
+
+/* ---------------- YOUR KICK ---------------- */
+function startYourKick() {
+  mode = "yourAnnounce";
+  const m = S.match;
+  const n = session === "practice" ? practiceScore.kicks + 1 : m.youKicks.length + 1;
+  banner = { text: `${S.flag} YOU TO SHOOT`, color: "#ffb52e",
+             sub: session === "practice" ? "friendly" : (m.sudden ? "SUDDEN DEATH" : `kick ${n} of 5`),
+             until: now() + T(1300) };
+  sfx.announce();
+  later(() => {
+    if (mode !== "yourAnnounce") return;
+    mode = "aiming";
+    hint = "move mouse to AIM (your aim sways, time it) · click to set POWER";
+  }, 1300);
+}
+
+function beginRunup() {
+  /* aim & power locked at the moment you click */
+  const p = pressure();
+  const target = { x: aim.x, y: aim.y };
+  if (power > 0.90) {
+    target.x += (Math.random() - 0.5) * 130 * (power - 0.85) * 10;
+    target.y -= Math.random() * 70 * (power - 0.85) * 6;
+  } else if (power < 0.5) {
+    target.y += 30 + Math.random() * 30;
+  }
+  target.y = Math.max(GOAL.y - 30, target.y);
+
+  const FRAME = 7;
+  const offX = target.x < GOAL.x + 6 || target.x > GOAL.x + GOAL.w - 6;
+  const offY = target.y < GOAL.y + 6;
+  let outcome = "goal";
+  if (offX || offY) {
+    const nearPost = Math.abs(target.x - GOAL.x) < FRAME + 8 || Math.abs(target.x - (GOAL.x + GOAL.w)) < FRAME + 8;
+    const nearBar = Math.abs(target.y - GOAL.y) < FRAME + 8;
+    outcome = (nearPost || nearBar) && Math.random() < 0.65 ? "woodwork" : "wide";
+  }
+
+  const col = Math.min(2, Math.max(0, Math.floor((target.x - GOAL.x) / (GOAL.w / 3))));
+  const row = target.y < GOAL.y + GOAL.h / 2 ? 0 : 1;
+  habit[col]++;
+  const aimCol = Math.min(2, Math.max(0, Math.floor((aim.x - GOAL.x) / (GOAL.w / 3))));
+  const keeperRating = session === "practice" ? 0.5 : S.match.opp.rating;
+  const k = pickKeeper(aimCol, keeperRating);
+
+  if (outcome === "goal") {
+    let saveP = 0;
+    if (k.col === col) {
+      saveP = power < 0.5 ? 0.95 : power <= 0.72 ? 0.62 : power <= 0.90 ? 0.34 : 0.42;
+      if (k.row !== row) saveP *= row === 0 ? 0.45 : 0.75;
+      if (col === 1) saveP += 0.18;
+    } else if (Math.abs(k.col - col) === 1) {
+      saveP = (power < 0.5 ? 0.5 : 0.12) * keeperRating;
+    }
+    saveP *= 0.7 + keeperRating * 0.55;
+    if (Math.random() < saveP) outcome = "saved";
+  }
+
+  /* VISUAL HONESTY: what's drawn must match the call.
+     Saved  -> keeper is drawn exactly where the ball goes; ball stops in his gloves.
+     Goal with keeper in the right column -> draw him at the wrong height,
+     so you can see he went the right way but didn't get there.            */
+  if (outcome === "saved") { k.col = col; k.row = row; }
+  else if (outcome === "goal" && k.col === col && k.row === row) { k.row = 1 - k.row; }
+
+  shot = { t: 0, from: { ...SPOT }, to: target, outcome, keeper: k, lockedPower: power };
+  runner = { t: 0, dur: T(620) };
+  hint = "";
+  mode = "runup";
+}
+function pickKeeper(aimCol, rating) {
+  const read = Math.min(0.55, 0.15 + rating * 0.3 + S.streak * 0.02);
+  let col;
+  if (Math.random() < read) col = aimCol;
+  else if (Math.random() < 0.55 && S.kicks > 4) {
+    const tot = habit[0] + habit[1] + habit[2] || 1;
+    let r = Math.random() * tot, i = 0;
+    while ((r -= habit[i]) > 0) i++;
+    col = Math.min(2, i);
+  } else col = (Math.random() * 3) | 0;
+  return { col, row: Math.random() < 0.62 ? 1 : 0 };
+}
+
+function settleYourKick() {
+  const scored = shot.outcome === "goal";
+  if (session === "practice") {
+    practiceScore.kicks++; if (scored) practiceScore.goals++;
+  } else {
+    S.kicks++; S.match.youKicks.push(scored);
+    if (scored) { S.goals++; S.streak++; S.best = Math.max(S.best, S.streak); }
+    else S.streak = 0;
+    persist();
+  }
+  renderBoard();
+  banner = {
+    text: scored ? "GOAL!" : shot.outcome === "woodwork" ? "OFF THE POST!" : shot.outcome === "wide" ? "WIDE!" : "SAVED!",
+    color: scored ? "#39c46a" : "#e6483d",
+    sub: scored ? "" : "the keeper " + (shot.outcome === "saved" ? "read it" : "is laughing"),
+    until: now() + T(1300),
+  };
+  (scored ? sfx.goal : shot.outcome === "woodwork" ? sfx.post : sfx.save)();
+  mode = "result";
+  later(() => {
+    shot = null;
+    if (session === "practice") return startYourKick();
+    if (session !== "live") return;          // gated mid-sequence
+    startOppKick();
+  }, 1500);
+}
+
+/* ---------------- THEIR KICK: you are the keeper ----------------
+   FAIRNESS: they commit to a corner HERE, before you choose your dive.
+   They never see your click. Your edge: body language + scouting.     */
+let pendingOpp = null;
+function startOppKick() {
+  mode = "oppAnnounce";
+  const m = S.match;
+  const col = [0, 0, 1, 2, 2][(Math.random() * 5) | 0];
+  const row = Math.random() < 0.55 ? 1 : 0;
+  const colW = GOAL.w / 3;
+  /* honest body language most of the time; better teams disguise more */
+  const honest = Math.random() > Math.min(0.45, 0.15 + m.opp.rating * 0.28);
+  const tellCol = honest ? col : (col === 1 ? (Math.random() < 0.5 ? 0 : 2) : 2 - col);
+  pendingOpp = {
+    col, row, tellCol,
+    x: GOAL.x + colW * col + colW * (0.25 + Math.random() * 0.5),
+    y: row === 0 ? GOAL.y + 30 + Math.random() * 35 : GOAL.y + GOAL.h - 50 + Math.random() * 35,
+  };
+  banner = { text: `${m.opp.flag} ${m.opp.name.toUpperCase()} TO SHOOT`, color: "#e6483d",
+             sub: m.sudden ? "SUDDEN DEATH" : `kick ${m.oppKicks.length + 1} of 5`,
+             until: now() + T(1300) };
+  sfx.announce();
+  const h = m.oppColHist;
+  if (h.length >= 2) {
+    const c = [0, 1, 2].map((i) => h.filter((x) => x === i).length);
+    ticker(`🎙️ Scouting ${m.opp.flag}: gone left ${c[0]}, middle ${c[1]}, right ${c[2]} this match.`, 0);
+  } else {
+    ticker(`🎙️ Watch the shooter's body shape. Most players telegraph it. The best ones lie.`, 0);
+  }
+  later(() => {
+    if (mode !== "oppAnnounce") return;
+    mode = "oppDive";
+    hint = "YOU'RE IN GOAL · read his body · dive with ← ↑ → or click a zone";
+  }, 1300);
+}
+
+function resolveDive(diveCol) {
+  if (mode !== "oppDive" || !pendingOpp) return;
+  const m = S.match, t = pendingOpp;
+  m.oppColHist.push(t.col);
+  let outcome;
+  if (Math.random() < 0.07) outcome = "wide";
+  else if (diveCol === t.col) {
+    const saveP = Math.max(0.35, 0.80 - m.opp.rating * 0.3);   // right way: usually yours
+    outcome = Math.random() < saveP ? "saved" : "goal";
+  } else {
+    outcome = "goal";   // wrong way is always a goal: what you see is what happened
+  }
+  oppShot = { t: 0, target: t, dive: diveCol, outcome };
+  pendingOpp = null;
+  hint = "";
+  mode = "oppFlight";
+  sfx.kick();
+}
+
+function settleOppKick() {
+  const m = S.match;
+  const scored = oppShot.outcome === "goal";
+  m.oppKicks.push(scored);
+  persist(); renderBoard();
+  banner = {
+    text: scored ? `${m.opp.flag} SCORE` : oppShot.outcome === "wide" ? `${m.opp.flag} BLAZE IT WIDE!` : "WHAT A SAVE!",
+    color: scored ? "#e6483d" : "#39c46a",
+    sub: scored ? (oppShot.dive === oppShot.target.col ? "right way, not enough" : "sent you the wrong way") : "",
+    until: now() + T(1300),
+  };
+  (scored ? sfx.oppGoal : sfx.goal)();
+  mode = "oppResult";
+  later(() => { oppShot = null; judgeMatch(); }, 1500);
+}
+
+/* ---------------- match logic ---------------- */
+function judgeMatch() {
+  if (session !== "live") return;
+  const m = S.match, you = mYou(), them = mThem();
+  const taken = m.youKicks.length;          // equal to oppKicks.length here
+  if (!m.sudden) {
+    const leftYou = 5 - taken, leftThem = 5 - m.oppKicks.length;
+    if (you > them + leftThem || them > you + leftYou) return endMatch(you > them);
+    if (taken >= 5) {
+      if (you === them) {
+        m.sudden = true; persist(); renderBoard();
+        ticker("🎙️ <b>SUDDEN DEATH.</b> Score and save to win it.", 0);
+        return startYourKick();
+      }
+      return endMatch(you > them);
+    }
+  } else if (you !== them) {
+    return endMatch(you > them);
+  }
+  startYourKick();
+}
+
+function endMatch(won) {
+  const m = S.match, you = mYou(), them = mThem();
+  mode = "locked";
+  if (won) {
+    if (m.stageIdx >= STAGES.length - 1) {
+      S.stars++;
+      S.trophies.push({ flag: S.flag, goals: S.goals, date: Date.now() });
+      S.match = newMatch(0, S.stars); persist();
+      renderTrophies();
+      sfx.trophy();
+      cupShow("🏆 CHAMPIONS!", `${S.flag} lift the Prompt Cup! Trophy number ${S.stars}.`,
+        `Every keeper in the next cup is sharper. See your cabinet via the ? button. Career: ${S.goals} goals · ${title()}.`);
+    } else {
+      S.match = newMatch(m.stageIdx + 1, S.stars); persist();
+      sfx.goal();
+      cupShow("MATCH WON", `${S.flag} beat ${m.opp.flag} ${m.opp.name} ${you}-${them} on penalties.`,
+        `Next: ${STAGES[S.match.stageIdx].name} vs ${S.match.opp.flag} ${S.match.opp.name}.`);
+    }
+  } else {
+    S.match = newMatch(m.stageIdx, S.stars); persist();
+    sfx.card();
+    cupShow("KNOCKED OUT", `${m.opp.flag} ${m.opp.name} win it ${them}-${you}.`,
+      `You replay the ${STAGES[m.stageIdx].name} against ${S.match.opp.flag} ${S.match.opp.name}. No shortcuts.`);
+  }
+  renderBoard();
+}
+function cupShow(t, line, sub) {
+  $("cupTitle").textContent = t; $("cupLine").textContent = line; $("cupSub").textContent = sub;
+  showOverlay("cupOverlay", true);
+}
+$("cupBtn").addEventListener("click", () => { showOverlay("cupOverlay", false); applyGate(); });
+
+/* ---------------- drawing ---------------- */
+function draw() {
+  for (let i = 0; i < H / 54 + 1; i++) {
+    cx.fillStyle = i % 2 ? "#2e7d3a" : "#27702f";
+    cx.fillRect(0, i * 54, W, 54);
+  }
+  cx.strokeStyle = "rgba(242,240,228,.85)"; cx.lineWidth = 3;
+  cx.strokeRect(GOAL.x - 70, GOAL.y + GOAL.h, GOAL.w + 140, H - GOAL.y - GOAL.h - 26);
+  cx.beginPath(); cx.arc(SPOT.x, SPOT.y, 4, 0, TAU); cx.fillStyle = "rgba(242,240,228,.9)"; cx.fill();
+
+  cx.lineWidth = 6; cx.strokeStyle = "#f2f0e4";
+  cx.strokeRect(GOAL.x, GOAL.y, GOAL.w, GOAL.h);
+  cx.lineWidth = 1; cx.strokeStyle = "rgba(242,240,228,.28)";
+  for (let i = 1; i < 16; i++) { cx.beginPath(); cx.moveTo(GOAL.x + GOAL.w/16*i, GOAL.y); cx.lineTo(GOAL.x + GOAL.w/16*i, GOAL.y + GOAL.h); cx.stroke(); }
+  for (let i = 1; i < 7; i++) { cx.beginPath(); cx.moveTo(GOAL.x, GOAL.y + GOAL.h/7*i); cx.lineTo(GOAL.x + GOAL.w, GOAL.y + GOAL.h/7*i); cx.stroke(); }
+
+  const yourTurnModes = ["yourAnnounce","aiming","power","runup","flight","result"];
+  const isYourSeq = yourTurnModes.includes(mode) || session === "practice";
+
+  /* persistent role ribbon: never wonder whose turn it is */
+  if (["aiming","power","runup","flight"].includes(mode)) {
+    drawRibbon(`⚽ YOUR KICK ${S.flag} — beat the keeper`);
+  } else if (mode === "oppDive" || mode === "oppFlight") {
+    drawRibbon(`🧤 YOU'RE IN GOAL ${S.flag} — save ${S.match.opp.flag}'s shot`);
+  }
+
+  /* keeper: theirs when you shoot, YOU (your kit) when they shoot */
+  const keeperKit = isYourSeq ? kit(S.match.opp.flag) : kit(S.flag);
+  drawKeeperFig(keeperKit);
+
+  if (mode === "oppDive") drawDiveZones();
+
+  /* the shooter on the spot */
+  if (mode === "aiming" || mode === "power" || mode === "runup") drawShooter(kit(S.flag));
+  if (mode === "oppAnnounce" || mode === "oppDive") drawShooter(kit(S.match.opp.flag));
+
+  if (mode === "flight" && shot) stepYourFlight();
+  else if (mode === "oppFlight" && oppShot) stepOppFlight();
+  else if (!["oppAnnounce","oppDive","oppResult"].includes(mode)) drawBall(SPOT.x, SPOT.y, 9);
+
+  if (mode === "aiming" || mode === "power") drawReticle();
+  if (mode === "power") drawPowerBar();
+
+  if (hint) {
+    cx.fillStyle = "rgba(16,36,58,.78)";
+    cx.fillRect(0, H - 26, W, 26);
+    cx.fillStyle = "#f2f0e4"; cx.font = "12px monospace"; cx.textAlign = "center";
+    cx.fillText(hint, W / 2, H - 9);
+  }
+  if (banner && now() < banner.until) {
+    cx.fillStyle = "rgba(10,24,39,.55)"; cx.fillRect(0, H/2 - 8, W, 96);
+    cx.fillStyle = banner.color; cx.font = "bold 44px monospace"; cx.textAlign = "center";
+    cx.fillText(banner.text, W / 2, H / 2 + 38);
+    if (banner.sub) { cx.fillStyle = "#f2f0e4"; cx.font = "13px monospace"; cx.fillText(banner.sub, W / 2, H / 2 + 64); }
+  }
+}
+
+function drawRibbon(text) {
+  cx.font = "bold 13px monospace"; cx.textAlign = "left";
+  const w = cx.measureText(text).width + 22;
+  cx.fillStyle = "rgba(16,36,58,.92)";
+  cx.fillRect(10, 10, w, 28);
+  cx.fillStyle = "#ffb52e";
+  cx.fillRect(10, 10, 4, 28);
+  cx.fillStyle = "#f2f0e4";
+  cx.fillText(text, 22, 29);
+}
+
+function drawDiveZones() {
+  const colW = GOAL.w / 3;
+  const labels = ["← LEFT", "↑ MIDDLE", "RIGHT →"];
+  for (let i = 0; i < 3; i++) {
+    cx.fillStyle = "rgba(255,181,46,.12)";
+    cx.fillRect(GOAL.x + colW * i + 2, GOAL.y + 2, colW - 4, GOAL.h - 4);
+    cx.strokeStyle = "rgba(255,181,46,.5)"; cx.lineWidth = 1;
+    cx.strokeRect(GOAL.x + colW * i + 2, GOAL.y + 2, colW - 4, GOAL.h - 4);
+    cx.fillStyle = "#ffb52e"; cx.font = "bold 13px monospace"; cx.textAlign = "center";
+    cx.fillText(labels[i], GOAL.x + colW * i + colW / 2, GOAL.y + GOAL.h / 2);
+  }
+}
+
+/* a little kit-colored figure */
+function drawFig(x, y, kitColors, opts = {}) {
+  const [pri, sec] = kitColors;
+  cx.save(); cx.translate(x, y); if (opts.lean) cx.rotate(opts.lean);
+  cx.fillStyle = pri; cx.fillRect(-11, -16, 22, 30);                  // shirt
+  cx.fillStyle = sec; cx.fillRect(-24, -12, 13, 8); cx.fillRect(11, -12, 13, 8); // sleeves
+  cx.fillStyle = "#f1c9a0"; cx.beginPath(); cx.arc(0, -25, 9, 0, TAU); cx.fill();
+  cx.fillStyle = sec; cx.fillRect(-9, 14, 7, 14); cx.fillRect(2, 14, 7, 14);     // shorts/legs
+  cx.restore();
+}
+function drawKeeperFig(kitColors) {
+  const colW = GOAL.w / 3;
+  let x = GOAL.x + GOAL.w / 2, y = GOAL.y + GOAL.h - 34, lean = 0;
+  const k = (mode === "flight" && shot) ? shot.keeper :
+            (mode === "oppFlight" || mode === "oppResult") && oppShot ? { col: oppShot.dive, row: 1 } : null;
+  if (k) {
+    x = GOAL.x + colW * k.col + colW / 2;
+    y = k.row === 0 ? GOAL.y + 46 : GOAL.y + GOAL.h - 34;
+    lean = k.col === 0 ? -0.5 : k.col === 2 ? 0.5 : 0;
+    /* you dove the right way but he beat you: drawn visibly short of the ball */
+    if (oppShot && oppShot.outcome === "goal" && oppShot.dive === oppShot.target.col) {
+      x += (oppShot.target.x < x ? -1 : 1) * -28;
+      y = GOAL.y + GOAL.h - 34;
+    }
+    /* you saved it: drawn at the ball's height, gloves on it */
+    if (oppShot && oppShot.outcome === "saved") {
+      y = oppShot.target.row === 0 ? GOAL.y + 46 : GOAL.y + GOAL.h - 34;
+    }
+  } else if (mode === "aiming" || mode === "power") {
+    x += Math.sin(swayT * 1.7) * 14;
+  }
+  drawFig(x, y, kitColors, { lean });
+}
+function drawShooter(kitColors) {
+  let x = SPOT.x - 46, y = SPOT.y - 6, lean = 0;
+  if (mode === "runup" && runner) {
+    const k = Math.min(1, runner.t / runner.dur);
+    x = SPOT.x - 46 + 36 * k;
+  }
+  /* body language: the tell, when you're in goal */
+  if (mode === "oppDive" && pendingOpp) {
+    x += (pendingOpp.tellCol - 1) * 16;
+    lean = (pendingOpp.tellCol - 1) * 0.14;
+  }
+  drawFig(x, y, kitColors, { lean });
+}
+
+function drawBall(x, y, r) {
+  cx.fillStyle = "#fff"; cx.beginPath(); cx.arc(x, y, r, 0, TAU); cx.fill();
+  cx.strokeStyle = "#10243a"; cx.lineWidth = 1.5; cx.stroke();
+  cx.beginPath(); cx.arc(x, y, r * 0.45, 0, TAU); cx.strokeStyle = "rgba(16,36,58,.6)"; cx.stroke();
+}
+function drawReticle() {
+  cx.strokeStyle = "#ffb52e"; cx.lineWidth = 2;
+  cx.beginPath(); cx.arc(aim.x, aim.y, 12, 0, TAU); cx.stroke();
+  cx.beginPath(); cx.moveTo(aim.x - 18, aim.y); cx.lineTo(aim.x + 18, aim.y);
+  cx.moveTo(aim.x, aim.y - 18); cx.lineTo(aim.x, aim.y + 18); cx.stroke();
+}
+function drawPowerBar() {
+  const bw = 220, bh = 14, bx = W / 2 - bw / 2, by = H - 56;
+  cx.fillStyle = "rgba(16,36,58,.85)"; cx.fillRect(bx - 3, by - 3, bw + 6, bh + 6);
+  cx.fillStyle = "rgba(57,196,106,.35)"; cx.fillRect(bx + bw * 0.72, by, bw * 0.18, bh);
+  const danger = power > 0.90, weak = power < 0.5;
+  cx.fillStyle = danger ? "#e6483d" : weak ? "#8a97a5" : power >= 0.72 ? "#39c46a" : "#ffb52e";
+  cx.fillRect(bx, by, bw * power, bh);
+  cx.strokeStyle = "#f2f0e4"; cx.strokeRect(bx, by, bw, bh);
+  cx.fillStyle = "#f2f0e4"; cx.font = "11px monospace"; cx.textAlign = "center";
+  cx.fillText(danger ? "BLAST: drifts" : weak ? "tame" : power >= 0.72 ? "SWEET" : "placed", W / 2, by - 8);
+}
+
+function stepYourFlight() {
+  const dur = T(520);
+  shot.t += 16.7;
+  const cap = shot.outcome === "saved" ? 0.82 : 1;     // saved balls stop in the gloves
+  const k = Math.min(cap, shot.t / dur);
+  const x = shot.from.x + (shot.to.x - shot.from.x) * k;
+  const y = shot.from.y + (shot.to.y - shot.from.y) * k - Math.sin(k * Math.PI) * 36;
+  drawBall(x, y, 9 - 3 * k);
+  if (k >= cap) settleYourKick();
+}
+function stepOppFlight() {
+  const dur = T(520);
+  oppShot.t += 16.7;
+  const cap = oppShot.outcome === "saved" ? 0.82 : 1;
+  const k = Math.min(cap, oppShot.t / dur);
+  const x = SPOT.x + (oppShot.target.x - SPOT.x) * k;
+  const y = SPOT.y + (oppShot.target.y - SPOT.y) * k - Math.sin(k * Math.PI) * 36;
+  drawBall(x, y, 9 - 3 * k);
+  if (k >= cap) settleOppKick();
+}
+
+/* ---------------- main loop ---------------- */
+function loop() {
+  try {
+    if (!frozen) {
+      swayT += 0.016;
+      if (mode === "aiming" || mode === "power") {
+        const a = swayAmp();
+        aim.x = mouseAim.x + Math.sin(swayT * 2.3) * a;
+        aim.y = mouseAim.y + Math.sin(swayT * 3.1 + 1.3) * a * 0.55;
+        aim.x = Math.max(GOAL.x - 26, Math.min(GOAL.x + GOAL.w + 26, aim.x));
+        aim.y = Math.max(GOAL.y - 18, Math.min(GOAL.y + GOAL.h - 6, aim.y));
+      }
+      if (mode === "power") {
+        power += powerDir * powerSpeed();
+        if (power >= 1) { power = 1; powerDir = -1; }
+        if (power <= 0) { power = 0; powerDir = 1; }
+      }
+      if (mode === "runup" && runner) {
+        runner.t += 16.7;
+        if (runner.t >= runner.dur) { runner = null; mode = "flight"; sfx.kick(); }
+      }
+      draw();
+    }
+  } catch (err) {
+    console.error("promptcup frame error:", err);
+    /* recover to a playable state instead of freezing */
+    shot = null; oppShot = null; runner = null; pendingOpp = null;
+    if (session === "live" || session === "practice") startYourKick();
+    else mode = "locked";
+  }
+  requestAnimationFrame(loop);
+}
+
+/* ---------------- ticker ---------------- */
+const TICK = $("ticker");
+let tickerTimer = null;
+function defaultTicker() {
+  return session === "live" ? "⚽ Play on."
+    : session === "practice" ? "⚽ Friendly in progress. Nothing counts."
+    : "⚽ Pitch closed. Waiting on your agent.";
+}
+function ticker(html, ms = 6000) {
+  TICK.innerHTML = html;
+  clearTimeout(tickerTimer);
+  if (ms) tickerTimer = setTimeout(() => { TICK.innerHTML = defaultTicker(); }, ms);
+}
+const PASS_LINES = [
+  (t) => `<b>${t}</b> keeps it ticking over in midfield.`,
+  (t) => `Lovely ball from <b>${t}</b>.`,
+  (t) => `<b>${t}</b> switches the play. Crowd approves.`,
+  (t) => `One-touch stuff from <b>${t}</b>.`,
+];
+const FAIL_LINES = [
+  (t) => `🟨 Yellow card. <b>${t}</b> went in studs up (tool error).`,
+  (t) => `<b>${t}</b> gives it away cheaply. Agent recovering.`,
+];
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+/* ---------------- the gate ---------------- */
+function showOverlay(id, on) {
+  $(id).classList.toggle("show", on);
+  frozen = ["lockedOverlay","ftOverlay","refOverlay","cupOverlay"].some((i) => $(i).classList.contains("show"));
+}
+function setLamp(phase, label) { $("agentLamp").className = "lamp-" + phase; $("lampText").textContent = label; }
+
+function applyGate() {
+  if (session === "live" || session === "practice") {
+    showOverlay("lockedOverlay", false);
+    if (mode === "locked") startYourKick();
+  } else {
+    mode = "locked"; shot = null; oppShot = null; runner = null; pendingOpp = null; clearTimers();
+    const m = S.match;
+    $("careerLine").textContent =
+      `Career: ${S.goals} goals from ${S.kicks} kicks · best streak ${S.best} · ${title()}` +
+      (S.stars ? ` · 🏆×${S.stars}` : "") +
+      ` | Cup: ${STAGES[m.stageIdx].name} vs ${m.opp.flag} ${m.opp.name}, ${mYou()}-${mThem()}`;
+    showOverlay("lockedOverlay", true);
+  }
+  $("endPracticeBtn").style.display = session === "practice" ? "inline-block" : "none";
+  TICK.innerHTML = defaultTicker();
+  renderBoard();
+}
+function goLive() {
+  session = "live";
+  setLamp("working", "AGENT LIVE");
+  showOverlay("ftOverlay", false); showOverlay("refOverlay", false);
+  applyGate();
+}
+
+$("practiceBtn").addEventListener("click", () => {
+  session = "practice";
+  practiceScore = { goals: 0, kicks: 0 };
+  setLamp("idle", "FRIENDLY");
+  ticker("⚽ Friendly under way. Nothing here counts. The real cup needs a live agent.", 8000);
+  applyGate();
+});
+$("endPracticeBtn").addEventListener("click", () => {
+  session = "locked"; clearTimers();
+  setLamp("idle", "PITCH CLOSED");
+  applyGate();
+});
+$("ftBtn").addEventListener("click", () => { showOverlay("ftOverlay", false); applyGate(); });
+$("refBtn").addEventListener("click", () => { showOverlay("refOverlay", false); });
+
+/* ---------------- agent events ---------------- */
+/* STALL WATCHDOG: Claude Code pauses on edit/bash permission prompts. If
+   you're mid-shootout you'll miss them and think work is happening when it
+   isn't. No hook fires for "waiting on permission" reliably in all clients,
+   so: 45s with zero hook events while live = interrupt the game and say so. */
+let lastEventAt = now();
+setInterval(() => {
+  if (session === "live" && now() - lastEventAt > 45000 && !frozen) {
+    setLamp("input", "CHECK AGENT");
+    $("refLine").textContent =
+      "No activity from your agent for 45+ seconds. It may be sitting on a permission prompt (edit / bash approval) in VS Code. Go check it, the match will wait.";
+    showOverlay("refOverlay", true);
+    sfx.card();
+    lastEventAt = now();   // re-arm rather than re-fire every tick
+  }
+}, 5000);
+
+const es = new EventSource("/events");
+es.addEventListener("UserPromptSubmit", (e) => {
+  lastEventAt = now();
+  const d = JSON.parse(e.data || "{}");
+  if (session === "practice") session = "locked";
+  goLive();
+  const m = S.match;
+  ticker(`🎙️ <b>KICKOFF.</b> ${STAGES[m.stageIdx].name} vs ${m.opp.flag} ${m.opp.name}` +
+         (m.youKicks.length ? `, resumed at ${mYou()}-${mThem()}` : "") +
+         `. ${d.prompt ? "Agent on: “" + escapeHtml(d.prompt) + "…”" : ""}`, 9000);
+});
+es.addEventListener("PostToolUse", (e) => {
+  lastEventAt = now();
+  const d = JSON.parse(e.data || "{}");
+  if (session !== "live") goLive();
+  setLamp("working", "AGENT LIVE");
+  if ($("refOverlay").classList.contains("show")) showOverlay("refOverlay", false);
+  const lines = d.ok === false ? FAIL_LINES : PASS_LINES;
+  if (d.ok === false) sfx.card();
+  ticker("🎙️ " + lines[(Math.random() * lines.length) | 0](escapeHtml(d.tool || "tool")));
+});
+es.addEventListener("Notification", (e) => {
+  lastEventAt = now();
+  const d = JSON.parse(e.data || "{}");
+  setLamp("input", "NEEDS INPUT");
+  $("refLine").textContent = d.message || "Your agent is waiting on a decision.";
+  showOverlay("refOverlay", true);
+  sfx.card();
+});
+es.addEventListener("Stop", () => {
+  setLamp("done", "FULL TIME");
+  session = "locked"; clearTimers();
+  const m = S.match;
+  $("ftScore").textContent =
+    `Cup: ${STAGES[m.stageIdx].name} vs ${m.opp.flag} ${m.opp.name}, suspended at ${mYou()}-${mThem()}` +
+    ` · Career ${S.goals}⚽, best streak ${S.best}`;
+  showOverlay("refOverlay", false); showOverlay("cupOverlay", false);
+  showOverlay("ftOverlay", true);
+  mode = "locked"; shot = null; oppShot = null; runner = null; pendingOpp = null;
+  sfx.whistle();
+});
+es.addEventListener("hello", (e) => {
+  const d = JSON.parse(e.data || "{}");
+  if (d.agentPhase === "working") goLive();
+  else { setLamp("idle", "PITCH CLOSED"); applyGate(); }
+});
+es.onerror = () => {
+  if (session === "live") { session = "locked"; clearTimers(); setLamp("idle", "NO SIGNAL"); applyGate(); }
+};
+
+/* ---------------- dev demo (?dev) ---------------- */
+document.querySelectorAll("[data-demo]").forEach((b) =>
+  b.addEventListener("click", () => {
+    const ev = b.dataset.demo;
+    const body =
+      ev === "UserPromptSubmit" ? { prompt: "refactor the auth flow and fix failing tests" } :
+      ev === "PostToolUse" ? { tool_name: ["Read","Edit","Bash","Grep"][(Math.random()*4)|0],
+                               tool_response: Math.random() < 0.2 ? { is_error: true } : {} } :
+      ev === "Notification" ? { message: "Claude needs your permission to run npm test" } : {};
+    fetch("/demo/" + ev, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  })
+);
+
+/* ---------------- boot ---------------- */
+renderTrophies();
+renderBoard();
+applyGate();
+loop();
+</script>
+</body>
+</html>

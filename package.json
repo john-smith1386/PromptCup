@@ -1,0 +1,55 @@
+{
+  "name": "promptcup",
+  "version": "1.0.0",
+  "description": "A penalty shootout you play while your coding agent works. The final whistle blows the moment the agent finishes.",
+  "type": "module",
+  "bin": {
+    "promptcup": "bin/cli.js"
+  },
+  "scripts": {
+    "start": "node bin/cli.js start",
+    "init": "node bin/cli.js init",
+    "check": "node --check server.js && node --check bin/cli.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "bin/",
+    "server.js",
+    "public/",
+    "INSTALL.md",
+    "Start Prompt Cup.bat",
+    "Start Prompt Cup.command",
+    "start.sh"
+  ],
+  "keywords": [
+    "claude-code",
+    "claude",
+    "agent",
+    "game",
+    "penalty",
+    "football",
+    "soccer",
+    "statusline",
+    "hooks",
+    "developer-tools",
+    "vibe-coding",
+    "codex",
+    "gemini",
+    "openai",
+    "multi-agent",
+    "copilot",
+    "github-copilot"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOURNAME/promptcup.git"
+  },
+  "bugs": {
+    "url": "https://github.com/YOURNAME/promptcup/issues"
+  },
+  "homepage": "https://github.com/YOURNAME/promptcup#readme",
+  "author": "YOURNAME",
+  "license": "MIT"
+}

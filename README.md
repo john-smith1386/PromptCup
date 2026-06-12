@@ -221,7 +221,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) to get involved.
 - **[KindnessSender](https://kindnesssender.com)** — send a little kindness.
 - **[Beadela](https://beadela.com)** — fuse-bead pattern app.
 
-## Support Me and Plan Trees
+## Support Me and Plant Trees
 - ** [PlantYourTip](https://plantyourtip.com/g2FfQQIl5d)** - A platform to donate and plant trees
 
 ## License

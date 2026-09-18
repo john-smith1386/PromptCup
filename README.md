@@ -221,13 +221,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) to get involved.
 - **[KindnessSender](https://kindnesssender.com)** — send a little kindness.
 - **[Beadela](https://beadela.com)** — fuse-bead pattern app.
 
-<<<<<<< HEAD
-## Support Me and Plant Trees
-- ** [PlantYourTip](https://plantyourtip.com/g2FfQQIl5d)** - A platform to donate and plant trees
-=======
 ## Support Me
 - **[Buy me a coffee](https://buymeacoffee.com/mike_k)** ☕
->>>>>>> 3aa2c57 (udpated to buymeacoffee)
 
 ## License
 

@@ -1,0 +1,26 @@
+# dependencies
+node_modules/
+package-lock.json
+yarn.lock
+
+# logs
+*.log
+npm-debug.log*
+
+# OS noise
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# editors
+.vscode/*
+!.vscode/tasks.example.json
+.idea/
+
+# local runtime state (lives in ~/.promptcup, but ignore if copied here)
+.promptcup/
+*.promptcup.bak
+
+# build / packaging artifacts
+*.zip
+dist/

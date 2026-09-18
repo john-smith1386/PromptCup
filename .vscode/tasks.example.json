@@ -1,0 +1,15 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "promptcup",
+      "type": "shell",
+      "command": "node",
+      "args": ["bin/cli.js", "start", "--no-open"],
+      "options": { "cwd": "CHANGE/ME/to/your/promptcup/path" },
+      "isBackground": true,
+      "runOptions": { "runOn": "folderOpen" },
+      "presentation": { "reveal": "never" }
+    }
+  ]
+}
